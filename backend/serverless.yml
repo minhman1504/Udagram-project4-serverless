@@ -1,27 +1,70 @@
 service:
-  name: serverless-todo-app
+  name: serverless-todo-app-1504
 
 plugins:
   - serverless-webpack
   - serverless-iam-roles-per-function
+  - serverless-reqvalidator-plugin
+  - serverless-aws-documentation
+
 
 provider:
   name: aws
   runtime: nodejs12.x
 
   stage: ${opt:stage, 'dev'}
-  region: ${opt:region, 'us-east-1'}
+  region: ${opt:region, 'ap-southeast-1'}
 
   environment:
     TODOS_TABLE: Todos-${self:provider.stage}
     TODOS_BY_USER_INDEX: TodosByUserIndex
-    ATTACHMENTS_S3_BUCKET: todos-attachments-${self:provider.stage}
+    ATTACHMENTS_S3_BUCKET: todos-attachments-1504-${self:provider.stage}
     SIGNED_URL_EXPIRATION: 300
-    AUTH_0_JWKS_URL: https://dev-cr9isr4f.eu.auth0.com/.well-known/jwks.json
+    AUTH_0_JWKS_URL: https://dev-0gljdosq.us.auth0.com/.well-known/jwks.json
 
   tracing:
     lambda: true
     apiGateway: true
+
+custom:
+  documentation:
+    api:
+      info:
+        version: v1.0.0
+        title: Udagram API
+        description: Serverless application for images sharing
+    models:
+      - name: TodoItem
+        contentType: "application/json"
+        schema: 
+          type: object
+          required:
+            - name
+            - dueDate
+          properties:
+            name:
+              minLength: 1
+              type: string
+            dueDate:
+              type: string
+
+      - name: TodoUpdate
+        contentType: "application/json"
+        schema: 
+          type: object
+          required:
+            - name
+            - dueDate
+            - done
+          properties:
+            name:
+              minLength: 1
+              type: string
+            dueDate:
+              type: string
+            done:
+              type: boolean
+
 
 functions:
 
@@ -64,6 +107,11 @@ functions:
           path: todos
           cors: true
           auth: Auth
+          reqValidatorName: RequestBodyValidator
+          documentation:
+            requestModels:
+              "application/json": TodoItem
+
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -92,6 +140,10 @@ functions:
           path: todos/{todoId}
           cors: true
           auth: Auth
+          reqValidatorName: RequestBodyValidator
+          documentation:
+            requestModels:
+              "application/json": TodoUpdate
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -247,3 +299,13 @@ resources:
               Action: 's3:GetObject'
               Resource: 'arn:aws:s3:::${self:provider.environment.ATTACHMENTS_S3_BUCKET}/*'
         Bucket: !Ref AttachmentsBucket
+    
+    #Validator
+    RequestBodyValidator:
+      Type: AWS::ApiGateway::RequestValidator
+      Properties:
+        Name: 'request-body-validator'
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        ValidateRequestBody: true
+        ValidateRequestParameters: false
